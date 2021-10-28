@@ -56,7 +56,7 @@ resource "azurerm_storage_account" "log_sa" {
     Create event hub namespace
 */
 resource "azurerm_eventhub_namespace" "log_ehns" {
-  name                = "${var.prefix}-${var.environment}-ehns"
+  name                = "${var.prefix}-${var.environment}-ns"
   resource_group_name = azurerm_resource_group.log_rg.name
   location            = azurerm_resource_group.log_rg.location
 
@@ -90,11 +90,110 @@ resource "azurerm_eventhub" "log_eh" {
 }
 
 /*
+    Create Azure AD diagnostic settings
+*/
+resource "azurerm_monitor_aad_diagnostic_setting" "example" {
+  name = "stream-to-la-sa-eh"
+
+  log_analytics_workspace_id     = azurerm_log_analytics_workspace.log_ws.id
+  storage_account_id             = azurerm_storage_account.log_sa.id
+  eventhub_name                  = azurerm_eventhub.log_eh.name
+  eventhub_authorization_rule_id = azurerm_eventhub_namespace_authorization_rule.log_ehns_authrule.id
+
+  log {
+    category = "AuditLogs"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+
+  log {
+    category = "SignInLogs"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+
+  log {
+    category = "NonInteractiveUserSignInLogs"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+
+  log {
+    category = "ServicePrincipalSignInLogs"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+
+  log {
+    category = "ManagedIdentitySignInLogs"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+
+  log {
+    category = "ProvisioningLogs"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+
+  log {
+    category = "ADFSSignInLogs"
+    enabled  = true
+
+    retention_policy {}
+  }
+
+  log {
+    category = "RiskyUsers"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+
+  log {
+    category = "UserRiskEvents"
+    enabled  = true
+
+    retention_policy {
+      enabled = true
+      days    = 1
+    }
+  }
+}
+
+/*
     Create activity log diagnostic settings
 */
 resource "azurerm_monitor_diagnostic_setting" "activity_log_diagnostics" {
   name               = "stream-to-la-sa-eh"
-  target_resource_id = "${data.azurerm_subscription.current.id}"
+  target_resource_id = data.azurerm_subscription.current.id
 
   log_analytics_workspace_id     = azurerm_log_analytics_workspace.log_ws.id
   storage_account_id             = azurerm_storage_account.log_sa.id
@@ -227,6 +326,7 @@ resource "azurerm_monitor_diagnostic_setting" "hub_nsg_diag" {
   eventhub_name                  = azurerm_eventhub.log_eh.name
   eventhub_authorization_rule_id = azurerm_eventhub_namespace_authorization_rule.log_ehns_authrule.id
 
+  /*
   log {
     category = "NetworkSecurityGroupEvent"
     enabled  = true
@@ -235,6 +335,32 @@ resource "azurerm_monitor_diagnostic_setting" "hub_nsg_diag" {
   log {
     category = "NetworkSecurityGroupRuleCounter"
     enabled  = true
+  }
+  */
+
+  // sample to iterate over the different log categories and metrics (if available)
+  dynamic "log" {
+    for_each = data.azurerm_monitor_diagnostic_categories.hub_nsg_diag_categories.logs
+    content {
+      category = log.value
+      enabled  = true
+      retention_policy {
+        enabled = true
+        days    = 7
+      }
+    }
+  }
+
+  dynamic "metric" {
+    for_each = data.azurerm_monitor_diagnostic_categories.hub_nsg_diag_categories.metrics
+    content {
+      category = metric.value
+      enabled  = true
+      retention_policy {
+        enabled = true
+        days    = 7
+      }
+    }
   }
 }
 
